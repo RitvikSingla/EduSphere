@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import eu.tutorials.edusphere.data.util.TokenPair
 import eu.tutorials.edusphere.domain.model.AuthResult
-import eu.tutorials.edusphere.domain.model.Role
 import eu.tutorials.edusphere.domain.repository.AuthRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
