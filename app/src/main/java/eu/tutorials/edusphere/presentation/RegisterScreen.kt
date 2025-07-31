@@ -3,7 +3,11 @@ package eu.tutorials.edusphere.presentation
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -12,136 +16,158 @@ import androidx.compose.ui.text.input.*
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import eu.tutorials.edusphere.data.util.TokenPair
+import eu.tutorials.edusphere.domain.model.AuthResult
 import eu.tutorials.edusphere.domain.viewModel.AuthViewModel
 import eu.tutorials.edusphere.presentation.components.AuthButton
 import eu.tutorials.edusphere.presentation.components.AuthTextField
 import eu.tutorials.edusphere.presentation.components.PasswordTextField
 import eu.tutorials.edusphere.presentation.components.RoleSelector
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RegisterScreen(
-    onRegisterSuccess: () -> Unit,
     onNavigateToLogin: () -> Unit,
+    onRegisterSuccess: () -> Unit,
     viewModel: AuthViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.registerState.collectAsState()
+    var name by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var selectedRole by remember { mutableStateOf("STUDENT") }
+    var passwordVisible by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(false) }
 
-    LaunchedEffect(uiState.isRegistrationSuccessful) {
-        if (uiState.isRegistrationSuccessful) {
-            onRegisterSuccess()
+    val roles = listOf("STUDENT", "INSTRUCTOR", "ADMIN")
+    val authState by viewModel.authState.collectAsState()
+
+    LaunchedEffect(authState) {
+        when (authState) {
+            is AuthResult.Success -> {
+                onRegisterSuccess()
+                viewModel.clearAuthState()
+            }
+
+            else -> {}
         }
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        // Logo/Brand
         Text(
-            text = "EduSphere",
-            style = MaterialTheme.typography.headlineLarge,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-
-        Text(
-            text = "Create your account to get started with learning.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
+            text = "Create Account",
+            style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier.padding(bottom = 32.dp)
         )
 
-        // Name Field
-        AuthTextField(
-            value = uiState.name,
-            onValueChange = viewModel::updateRegisterName,
-            label = "Full Name",
-            modifier = Modifier.padding(bottom = 16.dp),
-            isError = uiState.error != null,
-            keyboardType = KeyboardType.Text,
-            enabled = !uiState.isLoading
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it },
+            label = { Text("Full Name") },
+            modifier = Modifier.fillMaxWidth()
         )
 
-        // Email Field
-        AuthTextField(
-            value = uiState.email,
-            onValueChange = viewModel::updateRegisterEmail,
-            label = "Email",
-            modifier = Modifier.padding(bottom = 16.dp),
-            isError = uiState.error != null,
-            keyboardType = KeyboardType.Email,
-            enabled = !uiState.isLoading
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = email,
+            onValueChange = { email = it },
+            label = { Text("Email") },
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
         )
 
-        // Password Field
-        PasswordTextField(
-            value = uiState.password,
-            onValueChange = viewModel::updateRegisterPassword,
-            label = "Password",
-            modifier = Modifier.padding(bottom = 16.dp),
-            isError = uiState.error != null,
-            enabled = !uiState.isLoading
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text("Password") },
+            modifier = Modifier.fillMaxWidth(),
+            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            trailingIcon = {
+                val image =
+                    if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
+                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                    Icon(imageVector = image, contentDescription = null)
+                }
+            }
         )
 
-        // Role Selector
-        RoleSelector(
-            selectedRole = uiState.selectedRole,
-            onRoleSelected = viewModel::updateRole,
-            modifier = Modifier.padding(bottom = 24.dp),
-            enabled = !uiState.isLoading
-        )
+        Spacer(modifier = Modifier.height(16.dp))
 
-        // Error Message
-        if (uiState.error != null) {
-            Card(
+        // Role Selection Dropdown
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = !expanded }
+        ) {
+            OutlinedTextField(
+                value = selectedRole,
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Role") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer
-                )
+                    .menuAnchor()
+            )
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
             ) {
-                Text(
-                    text = uiState.error ?: "",
-                    color = MaterialTheme.colorScheme.onErrorContainer,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(16.dp)
-                )
+                roles.forEach { role ->
+                    DropdownMenuItem(
+                        text = { Text(role) },
+                        onClick = {
+                            selectedRole = role
+                            expanded = false
+                        }
+                    )
+                }
             }
         }
 
-        // Register Button
-        AuthButton(
-            text = "Sign Up",
-            onClick = viewModel::register,
-            modifier = Modifier.padding(bottom = 16.dp),
-            enabled = uiState.name.isNotBlank() &&
-                    uiState.email.isNotBlank() &&
-                    uiState.password.isNotBlank(),
-            isLoading = uiState.isLoading
-        )
+        Spacer(modifier = Modifier.height(24.dp))
 
-        // Login Link
-        Row(
-            modifier = Modifier.padding(top = 16.dp),
-            horizontalArrangement = Arrangement.Center
+        Button(
+            onClick = { viewModel.register(name, email, password, selectedRole) },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = authState !is AuthResult.Loading
         ) {
-            Text(
-                text = "Already have an account? ",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = "Sign In",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.clickable { onNavigateToLogin() }
-            )
+            if (authState is AuthResult.Loading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            } else {
+                Text("Register")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        TextButton(onClick = onNavigateToLogin) {
+            Text("Already have an account? Login")
+        }
+
+        // Error handling
+        when (authState) {
+            is AuthResult.Error -> {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = (authState as AuthResult.Error<TokenPair>).message,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+
+            else -> {}
         }
     }
 }

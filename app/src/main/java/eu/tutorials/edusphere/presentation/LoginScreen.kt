@@ -2,6 +2,10 @@ package eu.tutorials.edusphere.presentation
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -10,6 +14,8 @@ import androidx.compose.ui.text.input.*
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import eu.tutorials.edusphere.data.util.TokenPair
+import eu.tutorials.edusphere.domain.model.AuthResult
 import eu.tutorials.edusphere.domain.viewModel.AuthViewModel
 import eu.tutorials.edusphere.presentation.components.AuthButton
 import eu.tutorials.edusphere.presentation.components.AuthTextField
@@ -17,106 +23,98 @@ import eu.tutorials.edusphere.presentation.components.PasswordTextField
 
 @Composable
 fun LoginScreen(
-    onLoginSuccess: () -> Unit,
     onNavigateToRegister: () -> Unit,
+    onLoginSuccess: () -> Unit,
     viewModel: AuthViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.loginState.collectAsState()
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
 
-    LaunchedEffect(uiState.isLoginSuccessful) {
-        if (uiState.isLoginSuccessful) {
-            onLoginSuccess()
+    val authState by viewModel.authState.collectAsState()
+
+    LaunchedEffect(authState) {
+        when (authState) {
+            is AuthResult.Success -> {
+                onLoginSuccess()
+                viewModel.clearAuthState()
+            }
+            else -> {}
         }
     }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        // Logo/Brand
         Text(
-            text = "EduSphere",
-            style = MaterialTheme.typography.headlineLarge,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-
-        Text(
-            text = "Welcome back! Please sign in to your account.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
+            text = "EduSphere Login",
+            style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier.padding(bottom = 32.dp)
         )
 
-        // Email Field
-        AuthTextField(
-            value = uiState.email,
-            onValueChange = viewModel::updateLoginEmail,
-            label = "Email",
-            modifier = Modifier.padding(bottom = 16.dp),
-            isError = uiState.error != null,
-            keyboardType = KeyboardType.Email,
-            enabled = !uiState.isLoading
+        OutlinedTextField(
+            value = email,
+            onValueChange = { email = it },
+            label = { Text("Email") },
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
         )
 
-        // Password Field
-        PasswordTextField(
-            value = uiState.password,
-            onValueChange = viewModel::updateLoginPassword,
-            label = "Password",
-            modifier = Modifier.padding(bottom = 24.dp),
-            isError = uiState.error != null,
-            enabled = !uiState.isLoading
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = password,
+            onValueChange = { password = it },
+            label = { Text("Password") },
+            modifier = Modifier.fillMaxWidth(),
+            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            trailingIcon = {
+                val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
+                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                    Icon(imageVector = image, contentDescription = null)
+                }
+            }
         )
 
-        // Error Message
-        if (uiState.error != null) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Button(
+            onClick = { viewModel.login(email, password) },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = authState !is AuthResult.Loading
+        ) {
+            if (authState is AuthResult.Loading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    color = MaterialTheme.colorScheme.onPrimary
                 )
-            ) {
-                Text(
-                    text = uiState.error ?: "",
-                    color = MaterialTheme.colorScheme.onErrorContainer,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(16.dp)
-                )
+            } else {
+                Text("Login")
             }
         }
 
-        // Login Button
-        AuthButton(
-            text = "Sign In",
-            onClick = viewModel::login,
-            modifier = Modifier.padding(bottom = 16.dp),
-            enabled = uiState.email.isNotBlank() && uiState.password.isNotBlank(),
-            isLoading = uiState.isLoading
-        )
+        Spacer(modifier = Modifier.height(16.dp))
 
-        // Register Link
-        Row(
-            modifier = Modifier.padding(top = 16.dp),
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = "Don't have an account? ",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = "Sign Up",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.clickable { onNavigateToRegister() }
-            )
+        TextButton(onClick = onNavigateToRegister) {
+            Text("Don't have an account? Register")
+        }
+
+        // Error handling
+        when (authState) {
+            is AuthResult.Error -> {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = (authState as AuthResult.Error<TokenPair>).message,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+            else -> {}
         }
     }
 }
